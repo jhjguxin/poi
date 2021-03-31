@@ -5,6 +5,7 @@ import os
 import xlwt
 import pandas as pd
 from transCoordinateSystem import gcj02_to_wgs84, gcj02_to_bd09
+import time
 #from shp import trans_point_to_shp
 
 '''
@@ -30,13 +31,13 @@ from transCoordinateSystem import gcj02_to_wgs84, gcj02_to_bd09
 amap_web_key = '申请的高德web秘钥'
 
 # TODO 2.分类关键字,最好对照<<高德地图POI分类关键字以及编码.xlsx>>来填写对应分类关键字(不是编码)，多个用逗号隔开
-keyword = ['大学']
+keyword = ['餐饮', '购物', '休闲', '住宿']
 
 # TODO 3.城市，多个用逗号隔开
-city = ['北京']
+city = ['北京市']
 
 # TODO 4.输出数据坐标系,1为高德GCJ20坐标系，2WGS84坐标系，3百度BD09坐标系
-coord = 2
+coord = 1
 
 # TODO 5. 输出数据文件格式,1为默认xls格式，2为csv格式
 data_file_format = 2
@@ -56,9 +57,21 @@ def getpois(cityname, keywords):
         result = getpoi_page(cityname, keywords, i)
         print(result)
         result = json.loads(result)  # 将字符串转换为json
+
+        if result['infocode'] in ["10044", "10003"]:
+            print(r"key " + amap_web_key + " 超限休眠中 " + "1 分钟")
+            time.sleep(60)
+            continue
+        if result['status'] == '0':
+            break
         if result['count'] == '0':
             break
 
+        time.sleep(0.5)
+        # 调用次数大于10万跳过当前类别抓取
+        if i >= 1000000:
+            print(r"key " + cityname + " keywords " + keywords + " 调用次数大于10万跳过当前类别抓取")
+            break
         hand(poilist, result)
         i = i + 1
     return poilist
@@ -156,7 +169,7 @@ def write_to_csv(poilist, cityname, classfield):
 
     df = pd.DataFrame(data_csv)
 
-    folder_name = 'poi-' + cityname + "-" + classfield
+    folder_name = 'poi-' + cityname
     folder_name_full = 'data' + os.sep + folder_name + os.sep
     if os.path.exists(folder_name_full) is False:
         os.makedirs(folder_name_full)
@@ -202,6 +215,9 @@ def get_areas(code):
     print('get_distrinct result:' + data)
 
     data = json.loads(data)
+
+    if len(data['districts']) == 0:
+        return ""
 
     districts = data['districts'][0]['districts']
     # 判断是否是直辖市
